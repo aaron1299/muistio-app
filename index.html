@@ -160,6 +160,7 @@
         <button class="btn primary" id="connectBtn">Yhdistä</button>
         <button class="btn" id="localBtn">Käytä vain paikallisesti</button>
         <button class="btn danger" id="disconnectBtn" style="display:none">Katkaise yhteys</button>
+        <button class="btn primary" id="inviteBtn" style="display:none">📋 Kopioi kutsulinkki kaverille</button>
         <span class="modal-msg" id="modalMsg"></span>
       </div>
     </div>
@@ -402,6 +403,7 @@
     $("tokenIn").value = "";
     $("modalMsg").textContent = "";
     $("disconnectBtn").style.display = connected() ? "inline-flex" : "none";
+    $("inviteBtn").style.display = connected() ? "inline-flex" : "none";
     $("overlay").classList.add("open");
   }
   function closeModal(){ $("overlay").classList.remove("open"); }
@@ -446,6 +448,16 @@
     updateConnChip(); setStatus("Paikallinen tila"); closeModal();
   }
 
+  function makeInvite(){
+    if(!connected()) return;
+    var link = location.origin + location.pathname + "#t=" + encodeURIComponent(state.token) + "&r=" + encodeURIComponent(state.repo);
+    var msg = $("modalMsg");
+    function done(){ msg.textContent = "Kutsulinkki kopioitu! Lähetä se kaverille yksityisesti (linkki sisältää tokenin)."; msg.style.color="var(--ok)"; }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(link).then(done, function(){ window.prompt("Kopioi kutsulinkki ja lähetä kaverille:", link); });
+    } else { window.prompt("Kopioi kutsulinkki ja lähetä kaverille:", link); }
+  }
+
   // ---------- Events ----------
   $("newBtn").onclick = newNote;
   $("emptyNew").onclick = newNote;
@@ -458,6 +470,7 @@
   $("connectBtn").onclick = connect;
   $("localBtn").onclick = function(){ closeModal(); if(!connected()) setStatus("Paikallinen tila"); };
   $("disconnectBtn").onclick = disconnect;
+  $("inviteBtn").onclick = makeInvite;
   $("overlay").addEventListener("click", function(e){ if(e.target===this) closeModal(); });
   $("menuBtn").onclick = function(){ $("app").classList.toggle("nav-open"); };
   function closeNav(){ $("app").classList.remove("nav-open"); }
@@ -469,10 +482,28 @@
   window.addEventListener("beforeunload", function(){ if(state.dirty) flushSave(); });
   window.addEventListener("online", function(){ if(connected()) pull(); });
 
+  // ---------- Kutsulinkki (magic-link) ----------
+  (function importInvite(){
+    var h = location.hash || "";
+    if(h.indexOf("t=")>=0){
+      var p={}; h.replace(/^#/,"").split("&").forEach(function(s){ var kv=s.split("="); p[kv[0]]=decodeURIComponent(kv[1]||""); });
+      if(p.t){
+        state.token=p.t; state.repo=p.r||DEFAULT_REPO;
+        localStorage.setItem(LS.token,state.token); localStorage.setItem(LS.repo,state.repo);
+        try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){ location.hash=""; }
+      }
+    }
+  })();
+
+  function ensureMe(){
+    if(state.me || !connected()) return;
+    api("/user").then(function(r){ return r.ok?r.json():null; }).then(function(u){ if(u&&u.login){ state.me=u.login; localStorage.setItem(LS.me,u.login); updateConnChip(); } }).catch(function(){});
+  }
+
   // ---------- Init ----------
   updateConnChip();
   renderList();
-  if(connected()){ setStatus("Synkronoidaan…","warn"); pull().then(function(){ startPolling(); }); }
+  if(connected()){ setStatus("Synkronoidaan…","warn"); ensureMe(); pull().then(function(){ startPolling(); }); }
   else { setStatus("Paikallinen tila – yhdistä GitHub jakaaksesi"); }
 })();
 </script>

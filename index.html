@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muistio</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+<style>
+  :root{
+    --bg:#f4f5f7; --surface:#fff; --ink:#1b2430; --muted:#6b7685; --line:#e6e8ec;
+    --brand:#3b5bdb; --brand-deep:#2f49af; --soft:#eef1fb; --ok:#178a5a; --warn:#b7791f; --err:#c23b3b;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55}
+  button{font-family:inherit;font-size:14px;cursor:pointer}
+  input,textarea{font-family:inherit}
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 13px;border-radius:10px;transition:background .15s,border-color .15s}
+  .btn:hover{background:#f0f2f5}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  .btn.primary:hover{background:var(--brand-deep)}
+  .btn.ghost{border-color:transparent;background:transparent}
+  .btn.danger:hover{border-color:var(--err);color:var(--err)}
+
+  .topbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .brand{font-weight:700;font-size:17px;display:flex;align-items:center;gap:8px}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--brand)}
+  .status{font-size:13px;color:var(--muted)}
+  .status.ok{color:var(--ok)} .status.err{color:var(--err)} .status.warn{color:var(--warn)}
+  .spacer{flex:1}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);background:var(--bg);border:1px solid var(--line);padding:5px 10px;border-radius:999px}
+  .chip .led{width:8px;height:8px;border-radius:50%;background:#c2c8d0}
+  .chip.live .led{background:var(--ok)}
+
+  .app{display:grid;grid-template-columns:300px 1fr;height:calc(100% - 53px)}
+  .sidebar{border-right:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;min-height:0}
+  .side-top{padding:12px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+  .search{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;outline:none}
+  .search:focus{border-color:var(--brand)}
+  .list{overflow:auto;flex:1;min-height:0}
+  .note-item{padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+  .note-item:hover{background:#f7f8fa}
+  .note-item.active{background:var(--soft)}
+  .note-item h4{margin:0 0 3px;font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .note-item p{margin:0;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .note-item .meta{margin-top:5px;font-size:11.5px;color:#9aa3ad;display:flex;gap:8px}
+  .empty-list{padding:24px 16px;color:var(--muted);font-size:14px;text-align:center}
+
+  .editor{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+  .ed-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .title-in{flex:1;border:none;outline:none;font-size:20px;font-weight:700;background:transparent;color:var(--ink)}
+  .ed-body{flex:1;min-height:0;display:flex}
+  .ta{flex:1;border:none;outline:none;resize:none;padding:20px 22px;font-size:15.5px;line-height:1.7;background:transparent;color:var(--ink);font-family:inherit}
+  .preview{flex:1;overflow:auto;padding:20px 22px}
+  .preview :first-child{margin-top:0}
+  .preview pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto}
+  .preview code{background:#eef1f5;padding:1px 5px;border-radius:5px}
+  .preview pre code{background:transparent;padding:0}
+  .preview blockquote{border-left:3px solid var(--line);margin:0;padding-left:14px;color:var(--muted)}
+  .ed-foot{padding:8px 18px;border-top:1px solid var(--line);background:var(--surface);font-size:12.5px;color:var(--muted);display:flex;gap:14px}
+  .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--muted);text-align:center;padding:24px}
+  .empty-state h2{margin:0;color:var(--ink);font-weight:600}
+
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+  .overlay.open{display:flex}
+  .modal{background:var(--surface);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow:auto;box-shadow:0 24px 70px -20px rgba(0,0,0,.4)}
+  .modal-head{padding:20px 22px 8px}
+  .modal-head h2{margin:0 0 4px;font-size:19px}
+  .modal-head p{margin:0;color:var(--muted);font-size:14px}
+  .modal-body{padding:14px 22px 22px;display:flex;flex-direction:column;gap:14px}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+  .field input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;outline:none}
+  .field input:focus{border-color:var(--brand)}
+  .field .hint{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .help{background:var(--soft);border:1px solid #dbe2fb;border-radius:12px;padding:14px;font-size:13.5px;line-height:1.65}
+  .help b{color:var(--brand-deep)}
+  .help a{color:var(--brand-deep)}
+  .help ol{margin:8px 0 0;padding-left:20px}
+  .modal-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .modal-msg{font-size:13.5px}
+
+  .menu-btn{display:none}
+  @media(max-width:760px){
+    .app{grid-template-columns:1fr}
+    .sidebar{position:fixed;z-index:30;top:53px;bottom:0;left:0;width:84%;max-width:320px;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.15)}
+    .app.nav-open .sidebar{transform:none}
+    .menu-btn{display:inline-flex}
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="btn ghost menu-btn" id="menuBtn" aria-label="Valikko">☰</button>
+  <span class="brand"><span class="dot"></span> Muistio</span>
+  <span class="status" id="status">Valmis</span>
+  <span class="spacer"></span>
+  <button class="chip" id="connChip" title="Yhdistä tai vaihda GitHub"><span class="led"></span><span id="connText">Paikallinen</span></button>
+</div>
+
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-top">
+      <input class="search" id="search" type="search" placeholder="Hae muistiinpanoista…">
+      <button class="btn primary" id="newBtn">＋ Uusi muistiinpano</button>
+    </div>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <section class="editor" id="editorPane">
+    <div class="empty-state" id="emptyState">
+      <h2>Tervetuloa Muistioon</h2>
+      <p>Luo ensimmäinen muistiinpano tai valitse sellainen listasta.<br>Jaa kaverin kanssa yhdistämällä GitHub oikeasta yläkulmasta.</p>
+      <button class="btn primary" id="emptyNew">＋ Uusi muistiinpano</button>
+    </div>
+    <div id="editor" style="display:none;flex:1;min-height:0;flex-direction:column">
+      <div class="ed-head">
+        <input class="title-in" id="title" placeholder="Otsikko">
+        <button class="btn ghost" id="previewBtn" title="Esikatselu (Markdown)">👁 Esikatselu</button>
+        <button class="btn ghost danger" id="deleteBtn" title="Poista">🗑</button>
+      </div>
+      <div class="ed-body">
+        <textarea class="ta" id="body" placeholder="Kirjoita tähän… (Markdown tuettu)"></textarea>
+        <div class="preview" id="preview" style="display:none"></div>
+      </div>
+      <div class="ed-foot">
+        <span id="metaUpdated"></span>
+        <span id="metaAuthor"></span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Jaa GitHubin kautta</h2>
+      <p>Yhdistä yksityiseen GitHub-repoon, niin sinä ja kaverisi näette ja muokkaatte samoja muistiinpanoja. Ei palvelinta, ei ylläpitoa.</p>
+    </div>
+    <div class="modal-body">
+      <div class="help">
+        <b>Näin liityt (kerran):</b>
+        <ol>
+          <li>Luo henkilökohtainen token: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
+          <li>Valitse <b>Resource owner</b> = repon omistaja, <b>Repository access</b> = Only select repositories → tämä repo.</li>
+          <li><b>Permissions → Repository → Contents → Read and write.</b> Luo token ja kopioi se.</li>
+          <li>Liitä token alle. Token tallentuu vain tämän selaimen muistiin, ei mihinkään muualle.</li>
+        </ol>
+      </div>
+      <div class="field">
+        <label for="repoIn">Repo (omistaja/nimi)</label>
+        <input id="repoIn" placeholder="esim. aaron1299/muistio" autocomplete="off" spellcheck="false">
+        <div class="hint">Repon tulee olla yksityinen, ja molemmat lisätään sen jäseniksi.</div>
+      </div>
+      <div class="field">
+        <label for="tokenIn">GitHub-token</label>
+        <input id="tokenIn" type="password" placeholder="github_pat_… tai ghp_…" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-actions">
+        <button class="btn primary" id="connectBtn">Yhdistä</button>
+        <button class="btn" id="localBtn">Käytä vain paikallisesti</button>
+        <button class="btn danger" id="disconnectBtn" style="display:none">Katkaise yhteys</button>
+        <span class="modal-msg" id="modalMsg"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // Esitäytetty repo: kaverin tarvitsee liittyä vain tokenilla.
+  var DEFAULT_REPO = "aaron1299/muistio";
+  var DATA_PATH = "notes.json";
+  var LS = { repo:"muistio.repo", token:"muistio.token", me:"muistio.me", notes:"muistio.notes", sha:"muistio.sha" };
+
+  var state = {
+    notes: load(LS.notes, []),
+    sha: localStorage.getItem(LS.sha) || null,
+    repo: localStorage.getItem(LS.repo) || "",
+    token: localStorage.getItem(LS.token) || "",
+    me: localStorage.getItem(LS.me) || "",
+    current: null,
+    dirty: false,
+    query: "",
+    saveTimer: null,
+    pollTimer: null,
+    syncing: false,
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) || def; }catch(e){ return def; } }
+  function saveLocal(){ localStorage.setItem(LS.notes, JSON.stringify(state.notes)); if(state.sha) localStorage.setItem(LS.sha, state.sha); }
+  function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+"-"+Math.random().toString(16).slice(2))); }
+  function now(){ return Date.now(); }
+  function esc(s){ return (s||"").replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+  function setStatus(text, type){ var el=$("status"); el.textContent=text; el.className="status"+(type?(" "+type):""); }
+  function fmtDate(t){ if(!t) return ""; var d=new Date(t); var dd=new Date(); var sameDay=d.toDateString()===dd.toDateString();
+    var time=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+    return sameDay ? "tänään "+time : (("0"+d.getDate()).slice(-2)+"."+("0"+(d.getMonth()+1)).slice(-2)+". "+time); }
+
+  function visibleNotes(){
+    var q = state.query.trim().toLowerCase();
+    return state.notes.filter(function(n){ return !n.deleted; })
+      .filter(function(n){ return !q || (n.title+" "+n.body).toLowerCase().indexOf(q)>=0; })
+      .sort(function(a,b){ return (b.updated||0)-(a.updated||0); });
+  }
+
+  function renderList(){
+    var list = $("list"); var items = visibleNotes();
+    if(!items.length){ list.innerHTML = '<div class="empty-list">'+(state.query?"Ei osumia.":"Ei vielä muistiinpanoja.")+'</div>'; return; }
+    list.innerHTML = "";
+    items.forEach(function(n){
+      var div = document.createElement("div");
+      div.className = "note-item"+(n.id===state.current?" active":"");
+      var snippet = (n.body||"").replace(/[#*`>_-]/g," ").replace(/\s+/g," ").trim().slice(0,80);
+      div.innerHTML = '<h4>'+esc(n.title||"(otsikoton)")+'</h4>'+
+        '<p>'+esc(snippet||"…")+'</p>'+
+        '<div class="meta"><span>'+fmtDate(n.updated)+'</span>'+(n.author?'<span>'+esc(n.author)+'</span>':'')+'</div>';
+      div.onclick = function(){ openNote(n.id); closeNav(); };
+      list.appendChild(div);
+    });
+  }
+
+  function openNote(id){
+    flushSave();
+    state.current = id; state.dirty=false;
+    var n = byId(id);
+    $("emptyState").style.display = n?"none":"flex";
+    $("editor").style.display = n?"flex":"none";
+    if(n){
+      $("title").value = n.title||"";
+      $("body").value = n.body||"";
+      showPreview(false);
+      renderMeta(n);
+    }
+    renderList();
+  }
+
+  function renderMeta(n){
+    $("metaUpdated").textContent = n.updated ? ("Muokattu "+fmtDate(n.updated)) : "";
+    $("metaAuthor").textContent = n.author ? ("· "+n.author) : "";
+  }
+
+  function byId(id){ for(var i=0;i<state.notes.length;i++){ if(state.notes[i].id===id) return state.notes[i]; } return null; }
+
+  function newNote(){
+    var n = { id:uid(), title:"", body:"", updated:now(), author:state.me||null, deleted:false };
+    state.notes.unshift(n); saveLocal();
+    openNote(n.id);
+    $("title").focus();
+    scheduleSave();
+  }
+
+  function onEdit(){
+    var n = byId(state.current); if(!n) return;
+    n.title = $("title").value;
+    n.body = $("body").value;
+    n.updated = now();
+    if(state.me) n.author = state.me;
+    state.dirty = true;
+    saveLocal();
+    renderMeta(n);
+    clearTimeout(state._listTimer); state._listTimer = setTimeout(renderList, 300);
+    scheduleSave();
+  }
+
+  function deleteNote(){
+    var n = byId(state.current); if(!n) return;
+    if(!confirm("Poistetaanko tämä muistiinpano?")) return;
+    n.deleted = true; n.updated = now(); state.dirty=false; saveLocal();
+    state.current = null;
+    $("emptyState").style.display="flex"; $("editor").style.display="none";
+    renderList(); scheduleSave();
+  }
+
+  // ---------- Markdown preview ----------
+  var previewOn = false;
+  function showPreview(on){
+    previewOn = on;
+    $("body").style.display = on?"none":"block";
+    $("preview").style.display = on?"block":"none";
+    $("previewBtn").innerHTML = on ? "✎ Muokkaa" : "👁 Esikatselu";
+    if(on){
+      var n = byId(state.current); var md = n?(n.body||""):"";
+      var html;
+      try{ html = window.marked ? window.marked.parse(md) : "<pre>"+esc(md)+"</pre>"; }
+      catch(e){ html = "<pre>"+esc(md)+"</pre>"; }
+      if(window.DOMPurify) html = window.DOMPurify.sanitize(html);
+      $("preview").innerHTML = html;
+    }
+  }
+
+  // ---------- GitHub sync ----------
+  function connected(){ return !!(state.repo && state.token); }
+
+  function api(path, opts){
+    opts = opts || {};
+    opts.headers = Object.assign({
+      "Authorization":"Bearer "+state.token,
+      "Accept":"application/vnd.github+json",
+      "X-GitHub-Api-Version":"2022-11-28"
+    }, opts.headers||{});
+    return fetch("https://api.github.com"+path, opts);
+  }
+  function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
+  function b64decode(b64){ return decodeURIComponent(escape(atob((b64||"").replace(/\s/g,"")))); }
+
+  function mergeById(base, over){
+    var m = {}; base.forEach(function(n){ m[n.id]=n; });
+    over.forEach(function(n){ var e=m[n.id]; if(!e || (n.updated||0) >= (e.updated||0)) m[n.id]=n; });
+    return Object.keys(m).map(function(k){ return m[k]; });
+  }
+
+  function loadRemote(){
+    return api("/repos/"+state.repo+"/contents/"+DATA_PATH+"?ref=HEAD&t="+now()).then(function(r){
+      if(r.status===404) return { notes:[], sha:null };
+      if(!r.ok) return r.json().then(function(j){ var e=new Error(j.message||("HTTP "+r.status)); e.status=r.status; throw e; });
+      return r.json().then(function(j){
+        var data; try{ data=JSON.parse(b64decode(j.content)); }catch(e){ data={notes:[]}; }
+        return { notes:(data.notes||[]), sha:j.sha };
+      });
+    });
+  }
+
+  function putNotes(notesArr, sha){
+    var body = { message:"update notes", content:b64encode(JSON.stringify({notes:notesArr},null,1)) };
+    if(sha) body.sha = sha;
+    return api("/repos/"+state.repo+"/contents/"+DATA_PATH, { method:"PUT", body:JSON.stringify(body) })
+      .then(function(r){ if(!r.ok) return r.json().then(function(j){ var e=new Error(j.message||("HTTP "+r.status)); e.status=r.status; throw e; });
+        return r.json().then(function(j){ return j.content.sha; }); });
+  }
+
+  function scheduleSave(){
+    if(!connected()){ return; }
+    setStatus("Tallennetaan…","warn");
+    clearTimeout(state.saveTimer);
+    state.saveTimer = setTimeout(doSave, 1100);
+  }
+  function flushSave(){ if(state.saveTimer){ clearTimeout(state.saveTimer); state.saveTimer=null; doSave(); } }
+
+  function doSave(){
+    if(!connected() || state.syncing) return;
+    state.syncing = true;
+    var attempt = 0;
+    function tryOnce(){
+      attempt++;
+      return loadRemote().then(function(remote){
+        var merged = mergeById(remote.notes, state.notes); // local wins on tie
+        return putNotes(merged, remote.sha).then(function(newSha){
+          state.notes = merged; state.sha = newSha; state.dirty=false; saveLocal();
+          setStatus("Tallennettu","ok"); renderList();
+        });
+      }).catch(function(e){
+        if((e.status===409 || e.status===422) && attempt<4){ return tryOnce(); }
+        if(e.status===401){ setStatus("Token virheellinen","err"); openModal(); }
+        else if(!navigator.onLine || e.message==="Failed to fetch"){ setStatus("Offline – tallennettu paikallisesti","warn"); }
+        else { setStatus("Tallennus epäonnistui: "+(e.message||""),"err"); }
+      });
+    }
+    tryOnce().then(function(){ state.syncing=false; });
+  }
+
+  function pull(){
+    if(!connected() || state.syncing || state.dirty) return Promise.resolve();
+    state.syncing = true;
+    return loadRemote().then(function(remote){
+      var merged = mergeById(state.notes, remote.notes); // remote wins on tie
+      state.notes = merged; state.sha = remote.sha; saveLocal();
+      // jos avoinna oleva poistettiin tai päivittyi, päivitä editori varovasti
+      if(state.current){
+        var n = byId(state.current);
+        if(!n || n.deleted){ state.current=null; $("emptyState").style.display="flex"; $("editor").style.display="none"; }
+        else if(!state.dirty){ if($("title").value!==(n.title||"")) $("title").value=n.title||""; if($("body").value!==(n.body||"")) $("body").value=n.body||""; renderMeta(n); }
+      }
+      renderList();
+      setStatus("Synkronoitu","ok");
+    }).catch(function(e){
+      if(!navigator.onLine || e.message==="Failed to fetch"){ setStatus("Offline","warn"); }
+      else if(e.status===401){ setStatus("Token virheellinen","err"); }
+      else { setStatus("Synkronointi epäonnistui","err"); }
+    }).then(function(){ state.syncing=false; });
+  }
+
+  function startPolling(){ stopPolling(); state.pollTimer = setInterval(pull, 15000); }
+  function stopPolling(){ if(state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer=null; } }
+
+  function updateConnChip(){
+    var chip=$("connChip"), txt=$("connText");
+    if(connected()){ chip.classList.add("live"); txt.textContent = state.me ? ("@"+state.me) : "Yhdistetty"; }
+    else { chip.classList.remove("live"); txt.textContent="Paikallinen"; }
+  }
+
+  // ---------- Modal ----------
+  function openModal(){
+    $("repoIn").value = state.repo || DEFAULT_REPO;
+    $("tokenIn").value = "";
+    $("modalMsg").textContent = "";
+    $("disconnectBtn").style.display = connected() ? "inline-flex" : "none";
+    $("overlay").classList.add("open");
+  }
+  function closeModal(){ $("overlay").classList.remove("open"); }
+
+  function connect(){
+    var repo = $("repoIn").value.trim().replace(/^https?:\/\/github\.com\//,"").replace(/\.git$/,"").replace(/\/$/,"");
+    var token = $("tokenIn").value.trim();
+    var msg = $("modalMsg");
+    if(!/^[^\/\s]+\/[^\/\s]+$/.test(repo)){ msg.textContent="Anna repo muodossa omistaja/nimi."; msg.style.color="var(--err)"; return; }
+    if(!token){ msg.textContent="Anna token."; msg.style.color="var(--err)"; return; }
+    msg.textContent="Tarkistetaan…"; msg.style.color="var(--muted)";
+    state.repo=repo; state.token=token;
+    api("/user").then(function(r){
+      if(!r.ok) throw new Error("Token ei kelpaa");
+      return r.json();
+    }).then(function(u){
+      state.me = u.login;
+      return api("/repos/"+repo).then(function(r){ if(!r.ok) throw new Error("Repoa ei löytynyt tai ei oikeuksia"); });
+    }).then(function(){
+      localStorage.setItem(LS.repo, state.repo);
+      localStorage.setItem(LS.token, state.token);
+      localStorage.setItem(LS.me, state.me);
+      updateConnChip();
+      msg.textContent="Yhdistetty! Synkronoidaan…"; msg.style.color="var(--ok)";
+      return pull();
+    }).then(function(){
+      // työnnä mahdolliset paikalliset muistiinpanot mukaan
+      if(state.notes.some(function(n){return !n.deleted;})) { return doSaveForce(); }
+    }).then(function(){
+      startPolling(); renderList(); setTimeout(closeModal, 600);
+    }).catch(function(e){
+      state.repo=localStorage.getItem(LS.repo)||""; state.token=localStorage.getItem(LS.token)||"";
+      msg.textContent = e.message||"Yhteys epäonnistui"; msg.style.color="var(--err)";
+    });
+  }
+  function doSaveForce(){ var d=state.dirty; state.dirty=true; return new Promise(function(res){ doSave(); var iv=setInterval(function(){ if(!state.syncing){ clearInterval(iv); state.dirty=d; res(); } },200); }); }
+
+  function disconnect(){
+    stopPolling();
+    state.repo=""; state.token=""; state.me="";
+    localStorage.removeItem(LS.repo); localStorage.removeItem(LS.token); localStorage.removeItem(LS.me);
+    updateConnChip(); setStatus("Paikallinen tila"); closeModal();
+  }
+
+  // ---------- Events ----------
+  $("newBtn").onclick = newNote;
+  $("emptyNew").onclick = newNote;
+  $("deleteBtn").onclick = deleteNote;
+  $("title").addEventListener("input", onEdit);
+  $("body").addEventListener("input", onEdit);
+  $("search").addEventListener("input", function(){ state.query=this.value; renderList(); });
+  $("previewBtn").onclick = function(){ showPreview(!previewOn); };
+  $("connChip").onclick = openModal;
+  $("connectBtn").onclick = connect;
+  $("localBtn").onclick = function(){ closeModal(); if(!connected()) setStatus("Paikallinen tila"); };
+  $("disconnectBtn").onclick = disconnect;
+  $("overlay").addEventListener("click", function(e){ if(e.target===this) closeModal(); });
+  $("menuBtn").onclick = function(){ $("app").classList.toggle("nav-open"); };
+  function closeNav(){ $("app").classList.remove("nav-open"); }
+  document.addEventListener("keydown", function(e){
+    if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="s"){ e.preventDefault(); flushSave(); }
+    if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="k"){ e.preventDefault(); $("search").focus(); }
+    if(e.key==="Escape") closeModal();
+  });
+  window.addEventListener("beforeunload", function(){ if(state.dirty) flushSave(); });
+  window.addEventListener("online", function(){ if(connected()) pull(); });
+
+  // ---------- Init ----------
+  updateConnChip();
+  renderList();
+  if(connected()){ setStatus("Synkronoidaan…","warn"); pull().then(function(){ startPolling(); }); }
+  else { setStatus("Paikallinen tila – yhdistä GitHub jakaaksesi"); }
+})();
+</script>
+</body>
+</html>
